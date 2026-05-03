@@ -55,7 +55,7 @@ services:
     environment:
       - JAEGER_HOST=jaeger
       - JAEGER_PORT=6831
-      - DATABASE_URL=postgresql://mluser:mlpassword@postgres:5432/mldb
+      - DATABASE_URL=postgresql+asyncpg://mluser:mlpassword@postgres:5432/mldb
       - REDIS_URL=redis://redis:6379
       - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY:-sk_test_placeholder}
       - STRIPE_PUBLISHABLE_KEY=${STRIPE_PUBLISHABLE_KEY:-pk_test_placeholder}
