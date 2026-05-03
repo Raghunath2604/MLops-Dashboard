@@ -1,9 +1,12 @@
-# Environment variables with secrets
+# ===== SENSITIVE / SECRET FILES =====
 .env
 .env.local
+.env.production
 .env.*.local
-.env.example
-# Python
+frontend/.env.production
+frontend/.env.local
+
+# ===== Python =====
 __pycache__/
 *.py[cod]
 *$py.class
@@ -12,36 +15,43 @@ __pycache__/
 *.egg-info/
 dist/
 build/
+.venv/
+venv/
 
-# IDE
+# ===== Node =====
+node_modules/
+frontend/node_modules/
+frontend/dist/
+
+# ===== IDE =====
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
 
-# Logs
+# ===== Logs =====
 *.log
 logs/
 
-# Database
+# ===== Database =====
 *.db
 *.sqlite
 
-# OS
+# ===== OS =====
 .DS_Store
 Thumbs.db
 
-# Docker
+# ===== Docker =====
 .dockerignore
 docker-compose.override.yml
 
-# Node
-node_modules/
-frontend/node_modules/
-frontend/dist/
+# ===== Local volume data =====
+loki/
+loki_wal/
+wal/
 
-# Deploy artifacts
+# ===== Deploy / AWS artifacts =====
 deploy.zip
 *.pem
 MLOpsKey.pem
@@ -50,7 +60,24 @@ userdata.sh
 trust-policy.json
 console.json
 
-# Local volumes
-loki/
-loki_wal/
-wal/
+# ===== Old / Unwanted docs =====
+PHASE1_COMPLETION.md
+PHASE1_SUMMARY.md
+PHASE2_COMPLETION.md
+QUICK_REFERENCE.md
+API_DOCUMENTATION.md
+AWS_DEPLOYMENT_GUIDE.md
+DEPLOYMENT_GUIDE.md
+GRAFANA_POSTGRESQL_SETUP.md
+TESTING_GUIDE.md
+.env.example
+
+# ===== Test / Scratch files =====
+test-endpoints.ps1
+test_multitenancy.py
+test_system.sh
+quickstart.sh
+migrate.sh
+dashboard.jsx
+dashboard.json
+aws-infrastructure.yaml
