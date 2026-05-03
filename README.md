@@ -1,4 +1,4 @@
-<![CDATA[<div align="center">
+<div align="center">
 
 # FinSight AI — MLOps Observability & SaaS Dashboard
 
@@ -505,4 +505,3 @@ VITE_CLERK_AFTER_SIGN_UP_URL=/dashboard
 **Last Updated**: May 2026 · **Version**: 4.0 (SaaS Edition)
 
 </div>
-]]>
