@@ -169,7 +169,7 @@ function App() {
               <h2 style={{ fontSize: '28px', fontWeight: 700, marginBottom: '8px' }}>Welcome back</h2>
               <p style={{ color: 'var(--text-secondary)' }}>Sign in to access your dashboard</p>
             </div>
-            <SignIn routing="hash" />
+            <SignIn />
           </div>
         </div>
       </SignedOut>
