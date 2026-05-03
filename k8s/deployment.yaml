@@ -1,0 +1,53 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mldashboard-api
+  namespace: default
+  labels:
+    app: mldashboard-api
+spec:
+  replicas: 3 # Instantly run 3 instances to handle 1000+ users!
+  selector:
+    matchLabels:
+      app: mldashboard-api
+  template:
+    metadata:
+      labels:
+        app: mldashboard-api
+    spec:
+      containers:
+      - name: mldashboard-api
+        image: 429288623250.dkr.ecr.us-east-1.amazonaws.com/mldashboard-api:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8000
+        env:
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: mldashboard-secrets
+              key: DATABASE_URL
+        - name: STRIPE_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: mldashboard-secrets
+              key: STRIPE_SECRET_KEY
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "500m"
+          limits:
+            memory: "2Gi"
+            cpu: "1000m"
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 10
+          periodSeconds: 5
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 20
+          periodSeconds: 10

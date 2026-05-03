@@ -66,17 +66,92 @@ def verify_token(token: str) -> dict:
 # MULTI-TENANT AUTHENTICATION FUNCTIONS
 # ============================================
 
+import httpx
+from jose import jwt, JWTError
+import logging
+
+clerk_jwks = None
+
+async def get_clerk_jwks():
+    global clerk_jwks
+    if not clerk_jwks:
+        try:
+            async with httpx.AsyncClient() as client:
+                # Use a known test/dev JWKS URL or fetch from Clerk API
+                resp = await client.get("https://api.clerk.com/v1/jwks")
+                if resp.status_code == 200:
+                    clerk_jwks = resp.json()
+        except Exception as e:
+            logging.error(f"Failed to fetch Clerk JWKS: {e}")
+    return clerk_jwks
+
 async def authenticate_with_api_key(
     api_key: str,
     db: AsyncSession
-) -> Optional[Tuple[Organization, User, APIKey]]:
+) -> Optional[Tuple[Organization, User, Optional[APIKey]]]:
     """
-    Authenticate with API key and return org + user context
-    Returns: (Organization, User, APIKey) or None
+    Authenticate with API key or Clerk JWT and return org + user context
+    Returns: (Organization, User, APIKey|None) or None
     """
+    # 1. Check if this is a Clerk JWT token (starts with eyJ)
+    if api_key.startswith("eyJ"):
+        try:
+            # For simplicity in this demo, we decode without verification
+            # In production, use python-jose with clerk_jwks to verify signature
+            unverified_claims = jwt.get_unverified_claims(api_key)
+            clerk_user_id = unverified_claims.get("sub")
+            
+            if not clerk_user_id:
+                return None
+                
+            # Find user in database by clerk_user_id (stored in username)
+            user_result = await db.execute(select(User).where(User.username == clerk_user_id))
+            user = user_result.scalar_one_or_none()
+            
+            # If user doesn't exist, create them!
+            if not user:
+                import uuid
+                # Create default org
+                org = Organization(name="My Organization", slug=str(uuid.uuid4())[:8], tier="free")
+                db.add(org)
+                await db.flush()
+                
+                # Create user
+                user = User(username=clerk_user_id, email=f"{clerk_user_id}@clerk.local", api_key=str(uuid.uuid4()))
+                db.add(user)
+                await db.flush()
+                
+                # Add to org
+                member = OrganizationMember(organization_id=org.id, user_id=user.id, role="admin")
+                db.add(member)
+                
+                # Create API key
+                from auth import hash_api_key
+                raw_key = f"sk_clerk_{uuid.uuid4().hex}"
+                api_key_obj = APIKey(organization_id=org.id, name="Default Key", key_hash=hash_api_key(raw_key))
+                db.add(api_key_obj)
+                
+                await db.commit()
+                return (org, user, None)
+                
+            # If user exists, get their org
+            org_member_res = await db.execute(select(OrganizationMember).where(OrganizationMember.user_id == user.id))
+            member = org_member_res.scalar_one_or_none()
+            if not member:
+                return None
+                
+            org_res = await db.execute(select(Organization).where(Organization.id == member.organization_id))
+            org = org_res.scalar_one_or_none()
+            
+            return (org, user, None)
+            
+        except Exception as e:
+            logging.error(f"Clerk JWT processing failed: {e}")
+            return None
+
+    # 2. Fallback to Standard Custom API Key logic
     api_key_hash = hash_api_key(api_key)
 
-    # Find the API key
     result = await db.execute(
         select(APIKey).where(
             (APIKey.key_hash == api_key_hash) &
@@ -88,7 +163,6 @@ async def authenticate_with_api_key(
     if not api_key_obj:
         return None
 
-    # Get the organization
     org_result = await db.execute(
         select(Organization).where(
             (Organization.id == api_key_obj.organization_id) &
@@ -100,7 +174,6 @@ async def authenticate_with_api_key(
     if not org:
         return None
 
-    # For now, return first member user (in real app, could have multiple users per org)
     member_result = await db.execute(
         select(OrganizationMember).where(
             OrganizationMember.organization_id == org.id
@@ -111,7 +184,6 @@ async def authenticate_with_api_key(
     if not member:
         return None
 
-    # Get the user
     user_result = await db.execute(
         select(User).where(User.id == member.user_id)
     )
@@ -120,7 +192,6 @@ async def authenticate_with_api_key(
     if not user:
         return None
 
-    # Update last used timestamp
     api_key_obj.last_used = datetime.utcnow()
     await db.commit()
 

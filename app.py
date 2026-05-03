@@ -274,13 +274,7 @@ async def rate_limit_check(request: Request, call_next):
         rate_limiter.increment_quota(request.state.org_id)
 
     return response
-@app.get("/")
-def home():
-    return {
-        "message": "BERT Sentiment Analysis API Running",
-        "model": "distilbert-base-uncased-finetuned-sst-2-english"
-    }
-
+# Removed / root JSON route to allow React frontend serving from catch-all
 @app.get("/health")
 def health():
     return {
@@ -311,8 +305,10 @@ async def predict(text: str, request: Request, db: AsyncSession = Depends(get_db
         )
 
     try:
+        import asyncio
         start_inference = time.time()
-        result = classifier(text)
+        # Run the CPU-bound ML inference in a separate thread so it doesn't block the FastAPI async event loop
+        result = await asyncio.to_thread(classifier, text)
         inference_time_ms = (time.time() - start_inference) * 1000
 
         label = result[0]["label"]
@@ -630,6 +626,33 @@ async def register(username: str, password: str, db: AsyncSession = Depends(get_
             status_code=500,
             content={"error": str(e)}
         )
+
+@app.get("/auth/my-key")
+async def get_my_key(request: Request, db: AsyncSession = Depends(get_db)):
+    if not request.state.org_id:
+        raise HTTPException(status_code=401)
+        
+    try:
+        # Generate a new API key if we don't store raw keys
+        # For security, we usually only store hashed keys, 
+        # so for this demo, if the user asks for their key, we'll issue a fresh one 
+        # and invalidate old ones, OR we just generate a new one if none exists.
+        # Actually, let's just generate a new one so they can copy it.
+        api_key = generate_api_key()
+        hashed_key = hash_api_key(api_key)
+        
+        new_key = APIKey(
+            organization_id=request.state.org_id,
+            name="Clerk Generated Key",
+            key_hash=hashed_key,
+            is_active=True
+        )
+        db.add(new_key)
+        await db.commit()
+        
+        return {"api_key": api_key}
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"error": str(e)})
 
 # ---------------------------------------------------
 # 14. Sentiment Distribution (for Grafana)

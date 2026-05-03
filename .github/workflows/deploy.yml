@@ -43,6 +43,23 @@ jobs:
         docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
         echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
 
-    - name: Update ECS Service
+    - name: Update KubeConfig for EKS
       run: |
-        aws ecs update-service --cluster ${{ env.ECS_CLUSTER }} --service ${{ env.ECS_SERVICE }} --force-new-deployment
+        # Replace 'mldashboard-eks' with your actual EKS cluster name
+        aws eks update-kubeconfig --region ${{ env.AWS_REGION }} --name mldashboard-eks
+
+    - name: Deploy Secrets to Kubernetes
+      run: |
+        # Inject the Stripe Secret Key from GitHub Secrets into Kubernetes
+        kubectl create secret generic mldashboard-secrets \
+          --from-literal=STRIPE_SECRET_KEY=${{ secrets.STRIPE_SECRET_KEY }} \
+          --from-literal=DATABASE_URL=${{ secrets.DATABASE_URL }} \
+          --dry-run=client -o yaml | kubectl apply -f -
+
+    - name: Deploy Application to Kubernetes
+      run: |
+        # Apply all the manifests in the k8s folder
+        kubectl apply -f k8s/
+        
+        # Force the deployment to pull the new image we just pushed
+        kubectl rollout restart deployment/mldashboard-api
