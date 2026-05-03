@@ -57,6 +57,12 @@ RequestsInstrumentor().instrument()
 
 tracer = trace.get_tracer(__name__)
 
+
+# ---------------------------------------------------
+# 2. FastAPI App
+# ---------------------------------------------------
+app = FastAPI(title="BERT Sentiment Analysis API")
+
 # ---------------------------------------------------
 # ACME Challenge for Let's Encrypt SSL
 # ---------------------------------------------------
@@ -65,11 +71,6 @@ async def acme_challenge(token: str):
     if token == "KKMR8PORmAPsCqdQkB7nsUK-SbXtSrh81rUPHBL4xi4":
         return Response(content="KKMR8PORmAPsCqdQkB7nsUK-SbXtSrh81rUPHBL4xi4.maHIM9BzVCHcDkLlo7dvJRdIA56A9I6AkygnMtYacWE", media_type="text/plain")
     return Response(status_code=404)
-
-# ---------------------------------------------------
-# 2. FastAPI App
-# ---------------------------------------------------
-app = FastAPI(title="BERT Sentiment Analysis API")
 
 # Instrument the app after creation
 FastAPIInstrumentor.instrument_app(app)
