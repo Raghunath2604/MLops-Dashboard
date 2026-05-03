@@ -433,7 +433,7 @@ h1, h2, h3, h4, h5, h6 {
   flex-direction: column;
   justify-content: space-between;
   padding: 48px;
-  background: linear-gradient(135deg, #09090b 0%, #1e1b4b 100%);
+  background: url('/bird-bg.png') center center / cover no-repeat;
   border-right: 1px solid rgba(255, 255, 255, 0.05);
   overflow: hidden;
 }
@@ -442,9 +442,7 @@ h1, h2, h3, h4, h5, h6 {
   content: '';
   position: absolute;
   top: 0; left: 0; right: 0; bottom: 0;
-  background-image: 
-    radial-gradient(circle at 80% 20%, rgba(59, 130, 246, 0.15) 0%, transparent 40%),
-    radial-gradient(circle at 20% 80%, rgba(168, 85, 247, 0.15) 0%, transparent 40%);
+  background: linear-gradient(135deg, rgba(9, 9, 11, 0.8) 0%, rgba(30, 27, 75, 0.4) 100%);
   z-index: 0;
 }
 
