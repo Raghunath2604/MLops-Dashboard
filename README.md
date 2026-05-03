@@ -494,6 +494,110 @@ VITE_CLERK_AFTER_SIGN_UP_URL=/dashboard
 
 ---
 
+## 🧩 Problem Statement & How This Project Solves It
+
+### The Problem
+
+In the real world, deploying a machine learning model is only **10% of the battle**. The remaining 90% — monitoring, debugging, scaling, and operating that model in production — is where most teams fail. Specifically:
+
+| # | Industry Problem | Impact |
+|---|-----------------|--------|
+| 1 | **"Model works on my laptop, breaks in production"** | No standardized deployment pipeline; models behave differently across environments |
+| 2 | **"We don't know when our model degrades"** | Silent failures — a model can return confident but wrong predictions for weeks with no alert |
+| 3 | **"We can't trace why a prediction was wrong"** | No audit trail; no way to replay what the model saw, when, and how long it took |
+| 4 | **"Our ML API goes down and nobody notices"** | No health checks, no latency tracking, no error rate monitoring |
+| 5 | **"Multiple teams can't share a single model securely"** | No multi-tenancy; one team's data leaks into another's dashboard |
+| 6 | **"We have no idea how much inference costs us"** | No usage tracking, no quotas, no billing — impossible to plan capacity |
+
+> These are the exact challenges described in Google's famous paper *"Hidden Technical Debt in Machine Learning Systems"* — where the actual ML code is a tiny fraction of a real production system.
+
+---
+
+### How FinSight AI Solves Each Problem
+
+**1. Reproducible Deployment → Docker Compose (10 services, one command)**
+
+```bash
+docker-compose up --build -d
+```
+The entire stack — model, database, cache, monitoring, logging, tracing, alerting — spins up identically on any machine. No "works on my laptop" issues. The same `docker-compose.yml` runs locally and on AWS EC2.
+
+---
+
+**2. Model Degradation Detection → Prometheus + Grafana + AlertManager**
+
+Prometheus scrapes the `/metrics` endpoint every 15 seconds, tracking:
+- `request_count_total` — Are requests flowing?
+- `error_count_total` — Is the error rate spiking?
+- `latency_seconds` — Is inference slowing down?
+
+When the error rate exceeds 5%, AlertManager fires an alert automatically:
+```yaml
+- alert: HighErrorRate
+  expr: rate(error_count_total[5m]) / rate(request_count_total[5m]) > 0.05
+```
+Grafana dashboards visualize these trends in real-time so you can catch degradation **before** users complain.
+
+---
+
+**3. Full Audit Trail → PostgreSQL + Loki + Jaeger**
+
+Every single prediction is stored in PostgreSQL with:
+- The exact input text
+- The model's output (POSITIVE/NEGATIVE)
+- Confidence score
+- Inference latency (milliseconds)
+- Timestamp and unique request ID
+
+Loki captures all application logs (via Promtail), and Jaeger traces the full lifecycle of every API request across services. You can trace any prediction back to the exact millisecond.
+
+---
+
+**4. Uptime & Reliability → Health Checks + Metrics Middleware**
+
+The `/health` endpoint provides instant service status. The custom middleware automatically increments counters and histograms on every request — no manual instrumentation needed. Prometheus scrapes this data and Grafana makes it visual:
+- Request rate (req/sec)
+- P95 latency
+- Error percentage
+
+---
+
+**5. Secure Multi-Tenancy → Organization-Level Data Isolation**
+
+Every user belongs to an **Organization**. Every database query is filtered by `organization_id`:
+```python
+PredictionRecord.organization_id == request.state.org_id
+```
+User A can **never** see User B's predictions, metrics, or API keys — even if they share the same model. This is the same isolation pattern used by Datadog, New Relic, and other enterprise SaaS platforms.
+
+---
+
+**6. Usage Tracking & Cost Control → Tiered Billing + Rate Limiting**
+
+Each organization has a subscription tier (Free / Pro / Business) with:
+- Monthly request quotas (10K / 100K / 1M)
+- Per-minute rate limits (10 / 100 / 500 RPM)
+- Automatic `429 Too Many Requests` enforcement
+
+The dashboard shows real-time quota consumption with a visual progress bar, so teams know exactly where they stand before hitting limits.
+
+---
+
+### The Result
+
+FinSight AI demonstrates a **complete MLOps lifecycle** — not just a model wrapped in an API, but the entire production infrastructure that enterprises need to operate ML safely, securely, and at scale:
+
+```
+Model Training → API Deployment → Authentication → Rate Limiting
+      → Inference → Database Storage → Metrics Collection
+      → Log Aggregation → Distributed Tracing → Alerting
+      → Dashboard Visualization → Billing & Quotas
+```
+
+> **This is not a tutorial project.** This is a production-grade system that mirrors the architecture of platforms like AWS SageMaker, Google Vertex AI, and Datadog — built from scratch with open-source tools.
+
+---
+
 <div align="center">
 
 **Built with ❤️ by [Raghunath](https://github.com/Raghunath2604)**
