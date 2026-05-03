@@ -1,0 +1,11 @@
+apiVersion: 1
+
+providers:
+  - name: 'Dashboard Provider'
+    orgId: 1
+    folder: 'ML Dashboards'
+    type: file
+    disableDeletion: false
+    editable: true
+    options:
+      path: /etc/grafana/provisioning/dashboards
