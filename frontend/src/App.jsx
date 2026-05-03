@@ -283,7 +283,7 @@ function App() {
                      <span style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>{usage?.usage_this_month} / {usage?.quota_limit}</span>
                    </div>
                    <div className="data-bar-track" style={{ height: '24px', borderRadius: '12px', background: 'rgba(255,255,255,0.05)', boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.5)' }}>
-                     <div className="data-bar-fill" style={{ width: \`\${Math.min(usage?.percentage_used || 0, 100)}%\`, background: 'linear-gradient(90deg, var(--accent-blue), var(--accent-purple))', boxShadow: '0 0 20px rgba(59, 130, 246, 0.4)' }} />
+                     <div className="data-bar-fill" style={{ width: `${Math.min(usage?.percentage_used || 0, 100)}%`, background: 'linear-gradient(90deg, var(--accent-blue), var(--accent-purple))', boxShadow: '0 0 20px rgba(59, 130, 246, 0.4)' }} />
                    </div>
                 </div>
               </div>
@@ -300,7 +300,7 @@ function App() {
                         <div className="activity-text">"{pred.input_text}"</div>
                         <div className="activity-time">{new Date(pred.timestamp).toLocaleTimeString()}</div>
                       </div>
-                      <span className={\`badge \${pred.prediction === 'POSITIVE' ? 'positive' : 'negative'}\`}>
+                      <span className={`badge ${pred.prediction === 'POSITIVE' ? 'positive' : 'negative'}`}>
                         {pred.prediction.substring(0, 3)}
                       </span>
                     </div>
@@ -346,7 +346,7 @@ function App() {
                           <div className="activity-time">{new Date(pred.timestamp).toLocaleString()}</div>
                         </div>
                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
-                          <span className={\`badge \${pred.prediction === 'POSITIVE' ? 'positive' : 'negative'}\`}>
+                          <span className={`badge ${pred.prediction === 'POSITIVE' ? 'positive' : 'negative'}`}>
                             {pred.prediction}
                           </span>
                           <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{(pred.confidence * 100).toFixed(1)}%</span>
@@ -398,7 +398,7 @@ function App() {
                   { name: 'pro', price: 29, reqs: '100,000', features: ['Low latency', '100 req/min', 'Priority support'] },
                   { name: 'business', price: 299, reqs: '1,000,000', features: ['Ultra-low latency', '500 req/min', 'SLA 99.9%'] }
                 ].map(plan => (
-                  <div key={plan.name} className={\`tier-card \${subscription?.tier === plan.name ? 'active' : ''}\`}>
+                  <div key={plan.name} className={`tier-card ${subscription?.tier === plan.name ? 'active' : ''}`}>
                      {subscription?.tier === plan.name && <span className="badge neutral" style={{ position: 'absolute', top: '16px', right: '16px' }}>Current Plan</span>}
                      <span style={{ fontSize: '18px', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>{plan.name}</span>
                      <div className="tier-price">${plan.price}<span style={{fontSize: '16px', color: 'var(--text-tertiary)', fontWeight: 500}}>/mo</span></div>
