@@ -1,62 +1,369 @@
-# 🚀 BERT Sentiment Analysis - Complete Monitoring System with PostgreSQL
+<![CDATA[<div align="center">
 
-## 📋 Project Overview
+# FinSight AI — MLOps Observability & SaaS Dashboard
 
-**Full ML Monitoring Stack with Persistent Storage:**
-- **Model**: BERT Sentiment Analysis (HuggingFace DistilBERT)
-- **API**: FastAPI with Prometheus metrics & health checks
-- **Database**: PostgreSQL for persistent prediction storage & analytics
-- **Logging**: Application logs → Promtail → Loki
-- **Monitoring**: Prometheus metrics collection
-- **Visualization**: Grafana dashboards
-- **Deployment**: Docker + Docker Compose (6 services)
+**Enterprise-grade ML inference platform with real-time observability, multi-tenant SaaS billing, and a premium React dashboard — powered by BERT, FastAPI, and a full Prometheus/Grafana/Loki/Jaeger stack.**
 
-**Status**: ✅ **PRODUCTION READY WITH PERSISTENCE**
+[![Python](https://img.shields.io/badge/Python-3.10-3776AB?logo=python&logoColor=white)](https://python.org)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.104-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
+[![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black)](https://react.dev)
+[![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)](https://docker.com)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15-4169E1?logo=postgresql&logoColor=white)](https://postgresql.org)
+[![Prometheus](https://img.shields.io/badge/Prometheus-Monitoring-E6522C?logo=prometheus&logoColor=white)](https://prometheus.io)
+[![Grafana](https://img.shields.io/badge/Grafana-Dashboards-F46800?logo=grafana&logoColor=white)](https://grafana.com)
+[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+
+<br/>
+
+![Dashboard Overview](screenshots/dashboard-overview.png)
+
+</div>
+
+---
+
+## 📋 Table of Contents
+
+- [Overview](#-overview)
+- [Screenshots](#-screenshots)
+- [Architecture](#-architecture)
+- [Tech Stack](#-tech-stack)
+- [Quick Start](#-quick-start)
+- [Services & Ports](#-services--ports)
+- [API Reference](#-api-reference)
+- [Observability Pipeline](#-observability-pipeline)
+- [Multi-Tenancy & Billing](#-multi-tenancy--billing)
+- [Project Structure](#-project-structure)
+- [Grafana Dashboards](#-grafana-dashboards)
+- [Deployment](#-deployment)
+- [Troubleshooting](#-troubleshooting)
+
+---
+
+## 🎯 Overview
+
+**FinSight AI** is a production-ready MLOps platform that combines:
+
+- 🧠 **BERT Sentiment Analysis** — Real-time NLP inference via HuggingFace DistilBERT
+- 📊 **Full Observability Stack** — Prometheus metrics, Grafana dashboards, Loki logs, Jaeger traces
+- 🏢 **Multi-Tenant SaaS** — Organization isolation, tiered subscriptions, API key management
+- 💳 **Billing System** — Free / Pro / Business tiers with rate limiting and monthly quotas
+- 🔐 **Clerk Authentication** — OAuth 2.0 (Google) with JWT-based API access
+- 🖥️ **Premium React Dashboard** — Dark-themed bento-grid UI with real-time metrics
+
+> **Status**: ✅ Production Ready — 10 containerized services, 15+ API endpoints, fully verified
+
+---
+
+## 📸 Screenshots
+
+<table>
+<tr>
+<td width="50%">
+
+**Login Page (Clerk OAuth)**
+![Login Page](screenshots/login-page.png)
+
+</td>
+<td width="50%">
+
+**Dashboard Overview**
+![Dashboard](screenshots/dashboard-overview.png)
+
+</td>
+</tr>
+<tr>
+<td width="50%">
+
+**Prometheus Targets (UP)**
+![Prometheus](screenshots/prometheus-targets.png)
+
+</td>
+<td width="50%">
+
+**Grafana Monitoring**
+![Grafana](screenshots/grafana-dashboard.png)
+
+</td>
+</tr>
+<tr>
+<td width="50%">
+
+**Jaeger Distributed Tracing**
+![Jaeger](screenshots/jaeger-tracing.png)
+
+</td>
+<td width="50%">
+
+**AlertManager**
+![AlertManager](screenshots/alertmanager.png)
+
+</td>
+</tr>
+</table>
 
 ---
 
 ## 🏗️ Architecture
 
 ```
-┌─────────────────────────────────────────────────────┐
-│                  USER REQUESTS                      │
-│              (localhost:8001)                       │
-└────────────────┬────────────────────────────────────┘
-                 │
-    ┌────────────▼────────────┐
-    │   FastAPI + BERT Model  │
-    │   ├─ /predict           │
-    │   ├─ /batch-predict     │
-    │   ├─ /health            │
-    │   ├─ /drilldown         │
-    │   ├─ /status            │
-    │   ├─ /metrics           │
-    │   ├─ /auth/register     │
-    │   ├─ /auth/login        │
-    │   ├─ /predictions       │
-    │   ├─ /predictions/stats │
-    │   └─ /predictions/export│
-    └────────┬────────────────┘
-             │
-      ┌──────┴────────┬──────────────┬──────────────┐
-      │               │              │              │
-      ▼               ▼              ▼              ▼
-  Prometheus     Promtail        Logs         PostgreSQL
-  (9090)         (collector)    (app.log)      (5432)
-   │                │              │              │
-   │                └──────┬───────┘              │
-   │                       ▼                      │
-   │                    Loki                      │
-   │                   (3100)                     │
-   │                       │                      │
-   └───────────┬───────────┘                      │
-               │                                  │
-               ▼                                  │
-            Grafana ◄──────────────────────────────┘
-           (3001)
-         Dashboard
-         + Analytics
+                          ┌──────────────────────────────┐
+                          │       React Frontend         │
+                          │  (Clerk Auth · Bento Grid)   │
+                          │        :5173 / :8001         │
+                          └──────────┬───────────────────┘
+                                     │ JWT Bearer Token
+                          ┌──────────▼───────────────────┐
+                          │  FastAPI + BERT Model (:8001)│
+                          │  ├─ /predict (sentiment)     │
+                          │  ├─ /batch-predict           │
+                          │  ├─ /predictions (CRUD)      │
+                          │  ├─ /billing/* (SaaS)        │
+                          │  ├─ /auth/* (Clerk + API)    │
+                          │  ├─ /metrics (Prometheus)    │
+                          │  └─ /health                  │
+                          └──┬────┬────┬────┬────┬───────┘
+                             │    │    │    │    │
+              ┌──────────────┘    │    │    │    └──────────────┐
+              │                   │    │    │                   │
+    ┌─────────▼──────┐  ┌────────▼────▼────▼──────┐  ┌────────▼────────┐
+    │  PostgreSQL    │  │  Observability Layer    │  │   Redis Cache   │
+    │  (:5432)       │  │                         │  │   (:6379)       │
+    │  ├─ users      │  │  Prometheus → :9091     │  │  Rate Limiting  │
+    │  ├─ orgs       │  │  Grafana    → :3001     │  │  Session Cache  │
+    │  ├─ predictions│  │  Loki       → :3011     │  └─────────────────┘
+    │  ├─ metrics    │  │  Promtail   (collector) │
+    │  ├─ billing    │  │  Jaeger     → :16686    │
+    │  └─ api_keys   │  │  AlertMgr   → :9093     │
+    └────────────────┘  └─────────────────────────┘
 ```
+
+### Data Flow
+
+```
+User Input → Clerk JWT → Rate Limiter → BERT Inference → PostgreSQL Storage
+                                              │
+                           ┌──────────────────┼──────────────────┐
+                           │                  │                  │
+                     Prometheus          Loki/Promtail       Jaeger
+                     (metrics)           (app logs)         (traces)
+                           │                  │                  │
+                           └──────────┬───────┘                  │
+                                      │                          │
+                                   Grafana ◄─────────────────────┘
+                                 (unified view)
+```
+
+---
+
+## 🛠️ Tech Stack
+
+| Layer | Technology | Purpose |
+|-------|-----------|---------|
+| **Frontend** | React 18 + Vite | Premium dark-themed SaaS dashboard |
+| **Auth** | Clerk (OAuth 2.0) | Google SSO, JWT tokens, session management |
+| **Backend** | FastAPI (Python 3.10) | Async REST API with 15+ endpoints |
+| **ML Model** | DistilBERT (HuggingFace) | Sentiment analysis inference (~40ms) |
+| **Database** | PostgreSQL 15 | Multi-tenant data storage with async SQLAlchemy |
+| **Cache** | Redis 7 | Rate limiting, session caching |
+| **Metrics** | Prometheus | Time-series metrics collection (15s scrape) |
+| **Dashboards** | Grafana | Real-time visualization with 4 data sources |
+| **Logs** | Loki + Promtail | Centralized log aggregation and search |
+| **Tracing** | Jaeger + OpenTelemetry | Distributed request tracing |
+| **Alerting** | AlertManager | Threshold-based alert routing |
+| **Container** | Docker Compose | 10-service orchestration |
+
+---
+
+## 🚀 Quick Start
+
+### Prerequisites
+
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/) (v4.0+)
+- [Node.js](https://nodejs.org/) (v18+ for frontend development)
+
+### One-Command Launch
+
+```bash
+# Clone the repository
+git clone https://github.com/Raghunath2604/MLops-Dashboard.git
+cd MLops-Dashboard
+
+# Start the full stack (10 containers)
+docker-compose up --build -d
+
+# Wait ~60 seconds for BERT model download on first run
+```
+
+### Windows Quick Start
+
+```batch
+run.bat
+```
+
+### Verify All Services
+
+```bash
+# API Health
+curl http://localhost:8001/health
+# → {"status": "healthy", "service": "BERT Sentiment Analysis API"}
+
+# Prometheus Targets
+curl http://localhost:9091/api/v1/targets
+# → fastapi target: "health": "up"
+
+# Grafana
+open http://localhost:3001  # admin / admin
+```
+
+---
+
+## 🌐 Services & Ports
+
+| Service | Port | URL | Credentials |
+|---------|------|-----|-------------|
+| **FinSight Dashboard** | `8001` | http://localhost:8001 | Clerk OAuth |
+| **FastAPI Docs** | `8001` | http://localhost:8001/docs | — |
+| **Grafana** | `3001` | http://localhost:3001 | `admin` / `admin` |
+| **Prometheus** | `9091` | http://localhost:9091 | — |
+| **Jaeger UI** | `16686` | http://localhost:16686 | — |
+| **AlertManager** | `9093` | http://localhost:9093 | — |
+| **Loki** | `3011` | http://localhost:3011 | — |
+| **PostgreSQL** | `5432` | `mluser` / `mlpassword` | DB: `mldb` |
+| **Redis** | `6379` | — | — |
+
+---
+
+## 📡 API Reference
+
+### Authentication
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/auth/register?username=&password=` | Register user, returns API key |
+| `GET` | `/auth/my-key` | Generate new API key (JWT required) |
+
+### ML Inference
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/predict?text=...` | Single sentiment prediction |
+| `POST` | `/batch-predict` | Batch predictions (JSON array) |
+
+### Data & Analytics
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/predictions?limit=&offset=` | Query prediction history |
+| `GET` | `/predictions/export?format=csv` | Export as CSV or JSON |
+| `GET` | `/model-metrics` | Aggregated model performance |
+| `GET` | `/sentiments` | Sentiment distribution |
+
+### Billing & Subscriptions
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/billing/subscription` | Current plan details |
+| `POST` | `/billing/upgrade?tier_name=pro` | Upgrade subscription tier |
+
+### Health & Monitoring
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/health` | Service health check |
+| `GET` | `/status` | Detailed status with DB health |
+| `GET` | `/metrics` | Prometheus metrics (scrape target) |
+
+### Example Usage
+
+```bash
+# 1. Register a user
+curl -X POST "http://localhost:8001/auth/register?username=demo&password=secret"
+# → {"username": "demo", "api_key": "RvmMR...", "organization": "demo-ba0f8f73"}
+
+# 2. Make a prediction
+curl -H "Authorization: Bearer YOUR_API_KEY" \
+     "http://localhost:8001/predict?text=This+product+is+amazing"
+# → {"prediction": "POSITIVE", "confidence": 0.9998, "inference_time_ms": 42.3}
+
+# 3. Batch predict
+curl -X POST -H "Authorization: Bearer YOUR_API_KEY" \
+     -H "Content-Type: application/json" \
+     -d '["Great service!", "Terrible experience", "Its okay"]' \
+     http://localhost:8001/batch-predict
+```
+
+---
+
+## 📊 Observability Pipeline
+
+### Prometheus → Grafana (Metrics)
+
+FastAPI exposes `/metrics` in Prometheus format. Prometheus scrapes every **15 seconds**.
+
+```promql
+# Request rate (req/sec)
+rate(request_count_total[1m])
+
+# Error rate (%)
+(rate(error_count_total[1m]) / rate(request_count_total[1m])) * 100
+
+# P95 Latency
+histogram_quantile(0.95, rate(latency_seconds_bucket[1m]))
+```
+
+### Promtail → Loki → Grafana (Logs)
+
+Application logs are written to `app.log`, collected by Promtail, and pushed to Loki.
+
+```logql
+# All application logs
+{job="model_logs"}
+
+# Filter for errors
+{job="model_logs"} |= "ERROR"
+
+# Prediction events
+{job="model_logs"} |= "Prediction Success"
+```
+
+### OpenTelemetry → Jaeger (Traces)
+
+Every API request is automatically instrumented with distributed tracing spans.
+
+- **FastAPI** instrumented via `FastAPIInstrumentor`
+- **SQLAlchemy** instrumented via `SQLAlchemyInstrumentor`
+- **HTTP** calls instrumented via `RequestsInstrumentor`
+
+### AlertManager (Alerting)
+
+Prometheus alert rules fire to AlertManager when thresholds are breached.
+
+```yaml
+# Alert when error rate exceeds 5%
+- alert: HighErrorRate
+  expr: rate(error_count_total[5m]) / rate(request_count_total[5m]) > 0.05
+  for: 5m
+```
+
+---
+
+## 🏢 Multi-Tenancy & Billing
+
+### Organization Isolation
+
+Every user belongs to an **Organization**. All data (predictions, metrics, API keys) is scoped to the organization level, ensuring complete tenant isolation.
+
+### Subscription Tiers
+
+| Tier | Price | Requests/Month | Rate Limit | Batch Size |
+|------|-------|----------------|------------|------------|
+| **Free** | $0 | 10,000 | 10 req/min | 100 |
+| **Pro** | $29 | 100,000 | 100 req/min | 1,000 |
+| **Business** | $299 | 1,000,000 | 500 req/min | 10,000 |
+
+### Rate Limiting
+
+Requests are rate-limited per organization based on their subscription tier. When exceeded, the API returns `429 Too Many Requests` with a `Retry-After` header.
 
 ---
 
@@ -64,547 +371,138 @@
 
 ```
 mldashborad/
-├── app.py                      # FastAPI + BERT model (15 endpoints)
-├── models.py                   # SQLAlchemy ORM models
-├── database.py                 # PostgreSQL async connection
-├── auth.py                     # JWT & API key authentication
-├── archive_job.py              # 90-day data archival scheduler
-├── requirements.txt            # Python dependencies
-├── Dockerfile                  # Container build
-├── docker-compose.yml          # 6-service orchestration
-├── prometheus.yml              # Prometheus scrape config
-├── loki-config.yaml            # Loki storage backend
-├── promtail-config.yaml        # Log collector config
-├── grafana-datasources.yml     # Grafana auto-config
-├── run.bat                     # Windows startup script
-├── app.log                     # Application logs
-└── README.md                   # Documentation
+├── app.py                          # FastAPI application (15+ endpoints)
+├── auth.py                         # Clerk JWT + API key authentication
+├── models.py                       # SQLAlchemy ORM (7 models)
+├── database.py                     # Async PostgreSQL connection
+├── billing.py                      # Stripe integration & tier logic
+├── rate_limiter.py                 # Per-org rate limiting engine
+├── archive_job.py                  # 90-day data retention scheduler
+├── requirements.txt                # Python dependencies
+├── Dockerfile                      # Multi-stage build (Node + Python)
+├── docker-compose.yml              # 10-service orchestration
+│
+├── prometheus.yml                  # Scrape config → fastapi:8000
+├── alert-rules.yml                 # Alert thresholds
+├── alertmanager.yml                # Alert routing config
+├── loki-config.yaml                # Loki storage backend
+├── promtail-config.yaml            # Log collector → Loki
+├── grafana-datasources.yml         # Auto-provisioned data sources
+├── grafana-dashboard.json          # Pre-built dashboard panels
+│
+├── frontend/                       # React 18 + Vite
+│   ├── src/
+│   │   ├── App.jsx                 # Main SaaS dashboard component
+│   │   ├── main.jsx                # Clerk provider setup
+│   │   └── index.css               # Premium dark theme (600+ lines)
+│   ├── .env.production             # Clerk keys & routing
+│   └── package.json
+│
+├── screenshots/                    # Documentation images
+├── .github/workflows/deploy.yml    # CI/CD pipeline
+└── README.md                       # This file
 ```
 
 ---
 
-## 🚀 Quick Start
+## 📊 Grafana Dashboards
 
-### Option 1: Using run.bat (Windows)
-```batch
-run.bat
-```
+### Auto-Configured Data Sources
 
-### Option 2: Manual Docker Commands
-```bash
-# Build images
-docker-compose build
+All data sources are provisioned automatically via `grafana-datasources.yml`:
 
-# Start all services
-docker-compose up -d
+| Source | Type | Internal URL |
+|--------|------|-------------|
+| Prometheus | Metrics | `http://prometheus:9090` |
+| Loki | Logs | `http://loki:3100` |
+| Jaeger | Traces | `http://jaeger:16686` |
+| AlertManager | Alerts | `http://alertmanager:9093` |
 
-# Wait 15 seconds for services to start
-# Check status
-docker-compose ps
-```
+### Import Pre-Built Dashboard
 
----
+1. Open **Grafana** → http://localhost:3001
+2. Login with `admin` / `admin`
+3. Navigate to **Dashboards** → **Import**
+4. Upload `grafana-dashboard.json`
+5. Select the Prometheus data source → **Import**
 
-## 🌐 Access Points
-
-| Service | External Port | Internal URL | Purpose |
-|---------|---------------|--------------|---------|
-| **FastAPI** | 8001 | - | ML model API |
-| **PostgreSQL** | 5432 | postgresql://postgres:5432/mldb | Persistent storage |
-| **Prometheus** | 9091 | http://prometheus:9090 | Metrics storage |
-| **Grafana** | 3001 | - | Dashboard UI |
-| **Loki** | 3011 | http://loki:3100 | Log aggregation |
-
-**Grafana Credentials**: `admin` / `admin`
-**PostgreSQL Credentials**: `mluser` / `mlpassword` (DB: `mldb`)
+**Included panels:** Request Rate · Error Rate · Average Latency · Sentiment Distribution · Recent Predictions · Predictions Over Time · Confidence Histogram
 
 ---
 
-## 📡 Available API Endpoints (15 Total)
+## ☁️ Deployment
 
-### Authentication (2 endpoints)
+### AWS EC2 (Recommended)
 
-**1. Register User**
+The project ships with a ready-to-use deployment script:
+
 ```bash
-POST /auth/register?username=myuser
-Response: {
-  "username":"myuser",
-  "api_key":"generated-api-key-store-safely",
-  "message":"Store this API key safely..."
-}
+# 1. Launch a t3.large EC2 instance (Ubuntu 22.04)
+# 2. Upload your code or use S3
+# 3. Run the stack
+docker-compose up --build -d
 ```
 
-**2. Login**
-```bash
-POST /auth/login?username=myuser&api_key=your-api-key
-Response: {
-  "access_token":"jwt-token",
-  "token_type":"bearer",
-  "username":"myuser"
-}
-```
+**Required Security Group Ports:** `8001`, `3001`, `9091`, `16686`, `9093`
 
-### Predictions (3 endpoints)
-```bash
-GET /health
-Response: {"status":"healthy","service":"BERT Sentiment Analysis API"}
-```
+### Environment Variables
 
-### 2. Single Prediction
-```bash
-GET /predict?text=I%20love%20this%20product
-Response: {
-  "input_text":"I love this product",
-  "prediction":"POSITIVE",
-  "confidence":0.9998788833618164,
-  "inference_time_ms":45.23
-}
-```
+```env
+# Backend (.env)
+DATABASE_URL=postgresql+asyncpg://mluser:mlpassword@postgres:5432/mldb
+REDIS_URL=redis://redis:6379
+JAEGER_HOST=jaeger
+JAEGER_PORT=6831
 
-### 3. Batch Predictions
-```bash
-POST /batch-predict
-Body: ["Great!", "Terrible", "Okay"]
-Response: {
-  "predictions":[
-    {"input_text":"Great!","prediction":"POSITIVE","confidence":0.9998,"inference_time_ms":44.5},
-    {"input_text":"Terrible","prediction":"NEGATIVE","confidence":0.9996,"inference_time_ms":43.2},
-    {"input_text":"Okay","prediction":"POSITIVE","confidence":0.9991,"inference_time_ms":45.1}
-  ]
-}
-```
-
-### 4. Query Predictions (with filters)
-```bash
-GET /predictions?limit=50&offset=0&date_from=2026-04-20&date_to=2026-04-23&confidence_min=0.95&prediction_type=POSITIVE
-Response: {
-  "predictions":[...],
-  "count":42,
-  "offset":0,
-  "limit":50
-}
-```
-
-### 5. Export Predictions
-```bash
-POST /predictions/export?format=csv&date_from=2026-04-20&date_to=2026-04-23
-Returns: CSV file with headers (ID, Input Text, Prediction, Confidence, Inference Time, Timestamp, Request ID)
-
-# Or JSON format:
-POST /predictions/export?format=json&date_from=2026-04-20&date_to=2026-04-23
-Returns: JSON array of predictions
-```
-
-### 6. Get Historical Statistics
-```bash
-GET /predictions/stats?date_from=2026-04-15&date_to=2026-04-23
-Response: {
-  "statistics":[
-    {
-      "date":"2026-04-23",
-      "predictions_count":156,
-      "avg_confidence":0.9745,
-      "avg_inference_time_ms":44.2
-    }
-  ],
-  "total_records":7
-}
-```
-
-### Health & Monitoring (3 endpoints)
-
-### 7. Health Check
-```bash
-GET /health
-Response: {"status":"healthy","service":"BERT Sentiment Analysis API"}
-```
-
-### 8. Drilldown Metrics
-```bash
-GET /drilldown
-Response: {
-  "request_count":31.0,
-  "error_count":0.0,
-  "latency_stats":{
-    "total":5.2,
-    "count":31,
-    "average":0.168
-  },
-  "status":"operational"
-}
-```
-
-### 9. Service Status (includes PostgreSQL health)
-```bash
-GET /status
-Response: {
-  "timestamp":1776918550.30648,
-  "services":{
-    "loki":{"url":"http://loki:3100/ready","status":"operational"},
-    "prometheus":{"url":"http://prometheus:9090/-/healthy","status":"operational"},
-    "postgres":{"url":"postgresql://postgres:5432/mldb","status":"operational"},
-    "api":{"status":"operational"}
-  },
-  "overall_status":"healthy"
-}
-```
-
-### Metrics (1 endpoint)
-
-### 10. Prometheus Metrics
-```bash
-GET /metrics
-Response: (Prometheus format with all counters and histograms)
-```
-
----
-
-## 🧪 Test the System
-
-### PowerShell Tests (Windows)
-```powershell
-# Test 1: Health
-Invoke-WebRequest -Uri "http://localhost:8001/health" -UseBasicParsing
-
-# Test 2: Single prediction
-Invoke-WebRequest -Uri "http://localhost:8001/predict?text=Great%20product" -UseBasicParsing
-
-# Test 3: Batch prediction
-$body = ConvertTo-Json @("Amazing", "Terrible", "Okay")
-Invoke-WebRequest -Uri "http://localhost:8001/batch-predict" -Method POST -Body $body -ContentType "application/json" -UseBasicParsing
-
-# Test 4: Check services
-Invoke-WebRequest -Uri "http://localhost:8001/status" -UseBasicParsing
-```
-
-### Bash Tests (Linux/Mac)
-```bash
-# Test 1: Health
-curl http://localhost:8001/health
-
-# Test 2: Single prediction
-curl "http://localhost:8001/predict?text=Great%20product"
-
-# Test 3: Batch prediction
-curl -X POST http://localhost:8001/batch-predict \
-  -H "Content-Type: application/json" \
-  -d '["Amazing", "Terrible", "Okay"]'
-
-# Test 4: Check services
-curl http://localhost:8001/status
-```
-
----
-
-## 📊 Grafana Setup
-
-### Auto-configured Data Sources
-✅ **Prometheus**: `http://prometheus:9090` (internal Docker network)
-✅ **Loki**: `http://loki:3100` (internal Docker network)
-✅ **PostgreSQL**: `postgres:5432/mldb` (internal Docker network)
-
-All are automatically configured via `grafana-datasources.yml`
-
-### Import Pre-configured Dashboard (Quick Start)
-1. Open Grafana: http://localhost:3001
-2. Login: `admin` / `admin`
-3. Click "+" → "Import"
-4. Choose "Upload JSON file"
-5. Select `grafana-dashboard.json` from the project folder
-6. Select Data Sources:
-   - Prometheus: `Prometheus`
-   - PostgreSQL: `PostgreSQL`
-7. Click "Import" → Done! 🎉
-
-The dashboard includes 8 pre-configured panels:
-- **Request Rate** - Real-time API request volume
-- **Error Rate** - Error percentage gauge
-- **Average Latency** - Response time trend
-- **Sentiment Distribution** - Pie chart of POSITIVE/NEGATIVE
-- **Recent Predictions** - Table of last 50 predictions
-- **User Analytics** - Per-user statistics table
-- **Predictions Over Time** - Daily prediction count
-- **Confidence Distribution** - Histogram of model confidence
-
-### Create Your First Dashboard (Manual)
-1. Open Grafana: http://localhost:3001
-2. Login: `admin` / `admin`
-3. Click "+" → "Dashboard" → "New Panel"
-4. Set Data Source to **Prometheus**
-5. Query Example: `rate(request_count_total[1m])`
-6. Save & done!
-
-### Sample Queries
-
-**Request Rate (req/sec)**:
-```promql
-rate(request_count_total[1m])
-```
-
-**Error Rate (%)**:
-```promql
-(rate(error_count_total[1m]) / rate(request_count_total[1m])) * 100
-```
-
-**P95 Latency (sec)**:
-```promql
-histogram_quantile(0.95, rate(latency_seconds_bucket[1m]))
-```
-
-**Application Logs (Loki)**:
-```logql
-{job="model_logs"}
-```
-
----
-
-## 🔄 Data Flow
-
-### Prediction Storage (Database)
-```
-User Request: /predict?text=...
-  ↓
-FastAPI model inference (~40-50ms)
-  ↓
-Store in PostgreSQL:
-  - input_text
-  - prediction (POSITIVE/NEGATIVE)
-  - confidence (0.0 - 1.0)
-  - inference_time_ms
-  - timestamp
-  - request_id (for batch tracking)
-  ↓
-Return response + inference_time_ms
-```
-
-### Metrics Collection
-```
-FastAPI (app.py)
-  ├─ request_count++ (every request)
-  ├─ latency_seconds (observed)
-  └─ error_count++ (on error)
-    ↓
-  /metrics endpoint (Prometheus format)
-    ↓
-  Prometheus scrapes (every 15 seconds)
-    ↓
-  Grafana queries Prometheus (every 5 seconds)
-    ↓
-  Dashboard updates in real-time
-```
-
-### Log Collection
-```
-FastAPI (app.py)
-  ├─ logger.info("Prediction Success...")
-  └─ logger.error("Prediction Failed...")
-    ↓
-  app.log file (and stdout)
-    ↓
-  Promtail reads (continuously)
-    ↓
-  Loki API POST /loki/api/v1/push
-    ↓
-  Loki stores & indexes
-    ↓
-  Grafana queries Loki
-    ↓
-  Logs panel updates (real-time)
-```
-
-### Data Archival (Daily)
-```
-PostgreSQL PredictionRecord table
-  ↓
-archive_job.py runs daily (configurable)
-  ├─ Mark predictions >90 days old as archived
-  ├─ Aggregate into ModelMetrics table
-  ├─ Delete records >180 days old
-  └─ Log activity
-    ↓
-ModelMetrics (daily aggregates)
-  ├─ predictions_count (daily total per user)
-  ├─ avg_confidence (daily average)
-  ├─ avg_inference_time_ms (daily average)
-  └─ date (for grouping)
+# Frontend (frontend/.env.production)
+VITE_CLERK_PUBLISHABLE_KEY=pk_test_...
+VITE_CLERK_SIGN_IN_URL=/sign-in
+VITE_CLERK_SIGN_UP_URL=/sign-up
+VITE_CLERK_AFTER_SIGN_IN_URL=/dashboard
+VITE_CLERK_AFTER_SIGN_UP_URL=/dashboard
 ```
 
 ---
 
 ## 🐛 Troubleshooting
 
-### Problem: Containers not starting
-```bash
-# Check Docker Desktop is running
-docker ps
-
-# View logs
-docker-compose logs
-
-# Restart
-docker-compose restart
-```
-
-### Problem: Can't access http://localhost:3001
-- Ensure Docker Desktop is running (Admin mode)
-- Wait 30 seconds (first startup is slow)
-- Check: `docker-compose ps` (should show 5 running containers)
-- View logs: `docker-compose logs grafana`
-
-### Problem: No metrics in Grafana
-1. Send requests: `curl http://localhost:8001/predict?text=test`
-2. Wait 15 seconds (Prometheus scrape interval)
-3. Refresh Grafana (F5)
-4. Query: `request_count_total`
-
-### Problem: Loki/Prometheus not connecting
-- Check internal URLs in Grafana: http://prometheus:9090 & http://loki:3100
-- These are **Docker network** URLs (not localhost)
-- Data sources already auto-configured
-
-### Problem: Logs not appearing
-1. Check app logs: `docker-compose logs -f fastapi`
-2. Verify Promtail is running: `docker-compose ps promtail`
-3. Check Loki: `curl http://localhost:3011/ready`
+| Problem | Solution |
+|---------|----------|
+| Containers not starting | Run `docker-compose logs` to check errors |
+| Can't access Grafana | Wait 30s after startup, check `docker-compose ps` |
+| No metrics in Grafana | Send a few requests first, wait 15s for scrape |
+| Clerk login redirect error | Add your domain to Clerk Dashboard → Redirect URLs |
+| Database column missing | Run `docker exec postgres_db psql -U mluser -d mldb -c "..."` |
+| Model download slow | First startup downloads ~250MB BERT model, be patient |
 
 ---
 
-## 📚 Useful Commands
+## 🎓 Technical Highlights (Resume / Interview)
 
-```bash
-# View all logs (follow mode)
-docker-compose logs -f
-
-# View specific service logs
-docker-compose logs -f fastapi
-docker-compose logs -f prometheus
-docker-compose logs -f loki
-docker-compose logs -f grafana
-docker-compose logs -f promtail
-
-# Restart specific service
-docker-compose restart fastapi
-docker-compose restart grafana
-
-# Stop all services (keeps data)
-docker-compose stop
-
-# Stop and remove (keeps data)
-docker-compose down
-
-# Full reset (removes all data & volumes)
-docker-compose down -v
-
-# Check service status
-docker-compose ps
-
-# Rebuild image
-docker-compose build --no-cache
-
-# Restart with rebuild
-docker-compose up -d --build
-```
+| # | Achievement |
+|---|-------------|
+| 1 | Deployed BERT sentiment analysis as a production REST API with <50ms inference |
+| 2 | Built a full observability pipeline: Prometheus + Grafana + Loki + Jaeger |
+| 3 | Implemented multi-tenant SaaS architecture with organization-level data isolation |
+| 4 | Designed tiered billing system with per-org rate limiting and monthly quotas |
+| 5 | Integrated Clerk OAuth 2.0 authentication with JWT-based API access |
+| 6 | Created premium React dashboard with real-time bento-grid metrics visualization |
+| 7 | Orchestrated 10 containerized microservices via Docker Compose |
+| 8 | Implemented distributed tracing with OpenTelemetry + Jaeger instrumentation |
+| 9 | Built async PostgreSQL storage with SQLAlchemy ORM and 90-day data retention |
+| 10 | Configured AlertManager with threshold-based alerting rules |
 
 ---
 
-## 🔧 Features in This Version
+<div align="center">
 
-✅ **PostgreSQL Integration**
-- Persistent storage of all predictions
-- User authentication with API keys & JWT tokens
-- 90-day rolling retention with automatic archival
-- Daily aggregated metrics (ModelMetrics table)
+**Built with ❤️ by [Raghunath](https://github.com/Raghunath2604)**
 
-✅ **Enhanced API Endpoints**
-- `/auth/register` - Create user with generated API key
-- `/auth/login` - Get JWT token for protected endpoints
-- `/predictions` - Query predictions with filters (date, confidence, type)
-- `/predictions/stats` - Historical daily statistics
-- `/predictions/export` - Download as CSV or JSON
-- Updated `/predict` & `/batch-predict` to store in database
-- Updated `/status` to include PostgreSQL health check
+[![Status](https://img.shields.io/badge/Status-Production%20Ready-brightgreen)]()
+[![Services](https://img.shields.io/badge/Services-10%2F10%20Running-blue)]()
+[![Endpoints](https://img.shields.io/badge/API%20Endpoints-15+-orange)]()
 
-✅ **Previous Features**
-- Error responses return HTTP 500 status code (not 200)
-- Logs sent to stdout for Promtail collection
-- Type hints for all FastAPI endpoints
-- Prometheus metrics properly accessed from Histogram objects
-- Service health checks with connectivity verification
+**Last Updated**: May 2026 · **Version**: 4.0 (SaaS Edition)
 
-✅ **Database Architecture**
-- Users table: authentication & API key tracking
-- PredictionRecord table: individual predictions with inference metrics
-- ModelMetrics table: daily aggregates for performance
-- Automatic archival job: keep only 90 days active, 180 days total
-
----
-
-## 🎓 What You Get
-
-✅ **Production-Ready ML API** - Sentiment analysis via REST
-✅ **Persistent Data Storage** - PostgreSQL with 90-day rolling retention
-✅ **User Authentication** - API keys + JWT token support
-✅ **Real-time Metrics** - Request rate, error rate, latency via Prometheus
-✅ **Centralized Logging** - All logs in Loki with live search
-✅ **Professional Dashboard** - Grafana with auto-configured data sources
-✅ **Health Monitoring** - Service status checks & connectivity validation
-✅ **Batch Processing** - Send multiple texts in one request
-✅ **Advanced Analytics** - Query predictions by date, confidence, type
-✅ **Data Export** - Download predictions as CSV or JSON
-✅ **Automatic Archival** - Keep 90 days active, 180 days in archive, auto-cleanup
-✅ **Containerized** - Docker Compose with 6 integrated services
-
----
-
-## 🚀 For Your Viva/Resume
-
-**Key Achievements**:
-1. ✅ Deployed BERT sentiment analysis as production REST API
-2. ✅ Implemented real-time Prometheus metrics collection
-3. ✅ Centralized logging with Grafana Loki (Promtail)
-4. ✅ Professional dashboard with service health monitoring
-5. ✅ **Persistent PostgreSQL storage** for predictions & analytics
-6. ✅ **User authentication** with API keys & JWT tokens
-7. ✅ **90-day rolling retention** with automatic archival
-8. ✅ **Advanced prediction queries** with filters & export (CSV/JSON)
-9. ✅ **15 API endpoints** (health, predict, batch-predict, auth, queries, etc.)
-10. ✅ Containerized 6-service system with Docker Compose
-11. ✅ All services connected and verified working
-
-**Technical Highlights**:
-- SQLAlchemy ORM with async PostgreSQL (asyncpg)
-- JWT token authentication & API key hashing
-- Automatic database initialization on startup
-- Daily archival job for data retention management
-- Type-safe FastAPI endpoints with dependency injection
-- Centralized Loki + Promtail log aggregation
-- Grafana dashboards with real-time metrics
-
-**Live Demo**:
-- Dashboard updates every 5 seconds
-- Metrics show real-time API performance
-- Logs appear instantly with search capability
-- Predictions stored permanently in PostgreSQL
-- Query historical data by date, confidence, prediction type
-- Error tracking with visual thresholds
-- Industry-grade monitoring + analytics architecture
-
----
-
-## 📞 Next Steps
-
-1. **Add Alerting**: Configure Grafana alerts for error rate > 5%
-2. **Custom Metrics**: Add model-specific KPIs
-3. **Kubernetes**: Deploy to production cluster
-4. **API Security**: Add authentication & rate limiting
-5. **Model Optimization**: Fine-tune for faster inference
-
----
-
-**Status**: ✅ Production Ready with Persistence  
-**Services**: 6/6 Running (FastAPI, PostgreSQL, Prometheus, Loki, Grafana, Promtail)
-**API Endpoints**: 15/15 Working (Auth: 2, Predictions: 5, Monitoring: 3, Metrics: 1, Health: 1)
-**Data Sources**: Prometheus ✅ | Loki ✅ | PostgreSQL ✅
-**Database**: PostgreSQL 15 with 90-day rolling retention
-**Version**: 3.0 (with PostgreSQL persistence)
-**Last Updated**: 2026-04-23
+</div>
+]]>

@@ -126,7 +126,6 @@ async def authenticate_with_api_key(
                 db.add(member)
                 
                 # Create API key
-                from auth import hash_api_key
                 raw_key = f"sk_clerk_{uuid.uuid4().hex}"
                 api_key_obj = APIKey(organization_id=org.id, name="Default Key", key_hash=hash_api_key(raw_key))
                 db.add(api_key_obj)

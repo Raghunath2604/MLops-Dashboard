@@ -35,3 +35,22 @@ Thumbs.db
 # Docker
 .dockerignore
 docker-compose.override.yml
+
+# Node
+node_modules/
+frontend/node_modules/
+frontend/dist/
+
+# Deploy artifacts
+deploy.zip
+*.pem
+MLOpsKey.pem
+mappings.json
+userdata.sh
+trust-policy.json
+console.json
+
+# Local volumes
+loki/
+loki_wal/
+wal/
