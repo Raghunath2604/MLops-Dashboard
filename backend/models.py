@@ -78,7 +78,7 @@ class User(Base):
     id = Column(Integer, primary_key=True)
     username = Column(String(255), nullable=False, index=True)  # No longer globally unique
     email = Column(String(255), unique=True, nullable=False, index=True)  # Email is global unique
-    api_key = Column(String(255), unique=True, nullable=False, index=True)  # Legacy, kept for backward compat
+    organization_id = Column(Integer, ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True, index=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     # Relationships

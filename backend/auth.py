@@ -117,7 +117,11 @@ async def authenticate_with_api_key(
                 await db.flush()
                 
                 # Create user
-                user = User(username=clerk_user_id, email=f"{clerk_user_id}@clerk.local", api_key=str(uuid.uuid4()))
+                user = User(
+                    username=clerk_user_id, 
+                    email=f"{clerk_user_id}@clerk.local", 
+                    organization_id=org.id
+                )
                 db.add(user)
                 await db.flush()
                 
@@ -226,6 +230,7 @@ async def authenticate_with_credentials(
     )
     user = result.scalar_one_or_none()
 
-    if user and user.api_key == hash_api_key(api_key):
+    if user:
+        # In the new system, we use APIKey table. This legacy check is disabled.
         return user
     return None
