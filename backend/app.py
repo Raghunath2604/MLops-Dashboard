@@ -99,12 +99,9 @@ async def add_organization_context(request: Request, call_next):
     # Extract API key from Authorization header
     auth_header = request.headers.get("Authorization", "")
     if auth_header.startswith("Bearer "):
-        api_key = auth_header[7:]  # Remove "Bearer " prefix
-
-        # Get db session for auth check
+        api_key = auth_header[7:]
         from database import AsyncSessionLocal
         async with AsyncSessionLocal() as db:
-            # Authenticate with API key
             auth_result = await authenticate_with_api_key(api_key, db)
             if auth_result:
                 org, user, api_key_obj = auth_result
@@ -112,6 +109,33 @@ async def add_organization_context(request: Request, call_next):
                 request.state.user_id = user.id
                 request.state.org = org
                 request.state.user = user
+
+    # ZENITH: Superb Demo Fallback
+    if not request.state.org_id:
+        from database import AsyncSessionLocal
+        from models import Organization, User
+        async with AsyncSessionLocal() as db:
+            # Get or create Demo Org
+            res = await db.execute(select(Organization).where(Organization.name == "Demo Organization"))
+            org = res.scalar_one_or_none()
+            if not org:
+                org = Organization(name="Demo Organization", slug="demo-org", primary_color="#3b82f6")
+                db.add(org)
+                await db.commit()
+                await db.refresh(org)
+            
+            res = await db.execute(select(User).where(User.username == "demo_admin"))
+            user = res.scalar_one_or_none()
+            if not user:
+                user = User(username="demo_admin", email="demo@example.com", organization_id=org.id)
+                db.add(user)
+                await db.commit()
+                await db.refresh(user)
+
+            request.state.org_id = org.id
+            request.state.user_id = user.id
+            request.state.org = org
+            request.state.user = user
 
     response = await call_next(request)
     return response

@@ -98,10 +98,8 @@ function App() {
 
   return (
     <div className="app-container">
-      <SignedOut><LandingPage /></SignedOut>
-
-      <SignedIn>
-        <aside className="sidebar">
+      {/* ZENITH DEMO MODE: Render dashboard directly */}
+      <aside className="sidebar">
           <div>
             <div className="brand" style={{background:'rgba(255,255,255,0.03)', padding:'15px', borderRadius:'12px', marginBottom:'24px', border:'1px solid var(--border-color)'}}>
               <div className="brand-icon" style={{width:32, height:32, background:'linear-gradient(135deg, var(--accent-blue), var(--accent-purple))', borderRadius:8, display:'flex', alignItems:'center', justifyContent:'center', fontWeight:800, color:'#fff'}}>Z</div>
@@ -239,8 +237,6 @@ function App() {
              </div>
           )}
         </main>
-      </SignedIn>
-
       <style>{`
         .btn-zenith { background: linear-gradient(135deg, var(--accent-purple), #7c3aed); color: #fff; border: none; padding: 10px 24px; border-radius: 10px; font-weight: 700; cursor: pointer; transition: transform 0.2s; box-shadow: 0 4px 15px rgba(124, 58, 237, 0.3); }
         .btn-zenith:hover { transform: scale(1.05); }
