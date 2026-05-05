@@ -11,11 +11,13 @@ FROM python:3.10-slim
 
 WORKDIR /app
 
-COPY requirements.txt .
+COPY backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY . .
-# Copy built frontend from Stage 1
+# Copy the backend code into /app
+COPY backend/ .
+
+# Copy built frontend from Stage 1 into /app/frontend/dist
 COPY --from=frontend-builder /app/frontend/dist ./frontend/dist
 
 EXPOSE 8000

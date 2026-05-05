@@ -19,6 +19,8 @@ class Organization(Base):
     name = Column(String(255), nullable=False)  # Company name
     slug = Column(String(255), unique=True, nullable=False, index=True)  # URL-friendly slug
     tier = Column(String(50), default="free", nullable=False)  # free, pro, business, enterprise
+    primary_color = Column(String(20), default="#3b82f6", nullable=False) # NEW: White-labeling
+    logo_url = Column(String(512), nullable=True) # NEW: White-labeling
     is_active = Column(Boolean, default=True, index=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -104,6 +106,10 @@ class PredictionRecord(Base):
     inference_time_ms = Column(Float, nullable=False)  # Model latency in milliseconds
     timestamp = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
     request_id = Column(UUID(as_uuid=True), default=uuid.uuid4, nullable=False)
+    model_version = Column(String(50), default="v1.0.0", nullable=False, index=True)
+    model_type = Column(String(50), default="sentiment", nullable=False, index=True)
+    is_flagged = Column(Boolean, default=False, index=True)
+    human_label = Column(String(50), nullable=True)
     archived = Column(Boolean, default=False, index=True)
 
     # NEW: Composite indexes for org isolation
@@ -114,6 +120,19 @@ class PredictionRecord(Base):
     # Relationships
     organization = relationship("Organization", back_populates="predictions")
     user = relationship("User", back_populates="predictions")
+
+class WebhookConfig(Base):
+    """Customer-defined webhooks for event-driven MLOps"""
+    __tablename__ = "webhook_configs"
+
+    id = Column(Integer, primary_key=True)
+    organization_id = Column(Integer, ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True)
+    url = Column(String(512), nullable=False)
+    events = Column(String(255), default="high_toxicity,drift_detected")
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    organization = relationship("Organization")
 
 
 
@@ -208,3 +227,17 @@ class Invoice(Base):
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     paid_at = Column(DateTime, nullable=True)
 
+class AuditLog(Base):
+    """Secure audit trail for all platform actions"""
+    __tablename__ = "audit_logs"
+
+    id = Column(Integer, primary_key=True)
+    organization_id = Column(Integer, ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    action = Column(String(255), nullable=False) # e.g., "RETRAIN_MODEL", "CREATE_API_KEY"
+    details = Column(Text, nullable=True)
+    ip_address = Column(String(50), nullable=True)
+    timestamp = Column(DateTime, default=datetime.utcnow, index=True)
+
+    organization = relationship("Organization")
+    user = relationship("User")

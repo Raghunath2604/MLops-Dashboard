@@ -1,0 +1,23 @@
+global:
+  resolve_timeout: 5m
+  smtp_smarthost: 'smtp.gmail.com:587'
+  smtp_from: 'raghunathareddygr94@gmail.com'
+  smtp_auth_username: 'raghunathareddygr94@gmail.com'
+  smtp_auth_password: 'xmik rbfc reyz nsng' # You must replace this with a real App Password
+  smtp_require_tls: true
+
+route:
+  group_by: ['alertname', 'cluster', 'service']
+  group_wait: 10s
+  group_interval: 10s
+  repeat_interval: 1h # Reduced from 12h for faster testing
+  receiver: 'email-receiver'
+
+receivers:
+  - name: 'email-receiver'
+    email_configs:
+      - to: 'raghunathareddygr94@gmail.com'
+        send_resolved: true
+    webhook_configs:
+      - url: 'http://localhost:5001/alerts' # Keep for custom integrations
+        send_resolved: true

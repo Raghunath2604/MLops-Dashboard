@@ -2,6 +2,15 @@ groups:
   - name: ml_alerts
     interval: 30s
     rules:
+      - alert: ModelDriftDetected
+        expr: model_confidence_score > 0 and model_confidence_score < 0.7
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Model confidence is dropping"
+          description: "Average confidence is {{ $value }}, indicating potential data drift. Retraining may be required."
+
       - alert: HighErrorRate
         expr: rate(error_count_total[5m]) > 0.05
         for: 1m
@@ -12,7 +21,7 @@ groups:
           description: "Error rate is {{ $value }} errors/sec"
 
       - alert: HighLatency
-        expr: histogram_quantile(0.95, rate(latency_seconds_bucket[5m])) > 5
+        expr: histogram_quantile(0.95, rate(latency_seconds_bucket[5m])) > 0.5
         for: 2m
         labels:
           severity: warning

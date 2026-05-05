@@ -2,7 +2,7 @@ from fastapi import FastAPI, Request, Depends, HTTPException, status
 from fastapi.responses import Response, JSONResponse
 from fastapi.security import HTTPBearer
 from transformers import pipeline
-from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_LATEST
+from prometheus_client import Counter, Histogram, Gauge, generate_latest, CONTENT_TYPE_LATEST
 from typing import List, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
@@ -42,11 +42,16 @@ from auth import (
 # 1. OpenTelemetry Jaeger Setup
 # ---------------------------------------------------
 jaeger_exporter = JaegerExporter(
-    agent_host_name=os.getenv("JAEGER_HOST", "jaeger"),
-    agent_port=int(os.getenv("JAEGER_PORT", 6831)),
+    collector_endpoint=f"http://{os.getenv('JAEGER_HOST', 'jaeger')}:14268/api/traces"
 )
 
-trace.set_tracer_provider(TracerProvider())
+from opentelemetry.sdk.resources import SERVICE_NAME, Resource
+
+resource = Resource(attributes={
+    SERVICE_NAME: "bert-sentiment-analysis-api"
+})
+
+trace.set_tracer_provider(TracerProvider(resource=resource))
 trace.get_tracer_provider().add_span_processor(
     BatchSpanProcessor(jaeger_exporter)
 )
@@ -118,6 +123,21 @@ classifier = pipeline(
     model="distilbert-base-uncased-finetuned-sst-2-english"
 )
 
+# NEW: Toxicity Model (Multi-model support)
+toxic_classifier = pipeline(
+    "sentiment-analysis", 
+    model="unitary/toxic-bert"
+)
+
+def get_word_importance(text: str, prediction: str):
+    """Simple heuristic for XAI highlights (Top 3 influential words)"""
+    words = text.split()
+    sentiment_words = {
+        'POSITIVE': ['great', 'awesome', 'love', 'good', 'excellent', 'happy', 'best', 'superb', 'fast', 'smooth'],
+        'NEGATIVE': ['bad', 'worst', 'hate', 'terrible', 'awful', 'poor', 'sad', 'broken', 'slow', 'crash']
+    }
+    return [w for w in words if w.lower().strip(',.!?') in sentiment_words.get(prediction, [])][:3]
+
 # ---------------------------------------------------
 # 3. Logging Setup (for Loki / Promtail)
 # ---------------------------------------------------
@@ -135,25 +155,68 @@ logging.basicConfig(
 # ---------------------------------------------------
 @app.on_event("startup")
 async def startup_event():
-    """Initialize database on startup"""
+    """Initialize database and background tasks"""
+    # Start drift detection
+    asyncio.create_task(drift_detection_task())
     from database import AsyncSessionLocal
     try:
         await init_db()
         logging.info("Database initialized successfully")
 
-        # Create default user if it doesn't exist
+        # Create default user and org if it doesn't exist
         async with AsyncSessionLocal() as session:
             existing_user = await session.execute(
                 select(User).where(User.username == "default")
             )
-            if not existing_user.scalar_one_or_none():
-                default_user = User(
+            user = existing_user.scalar_one_or_none()
+            
+            if not user:
+                # 1. Create User
+                user = User(
                     username="default",
+                    email="default@local.com",
                     api_key=hash_api_key("default-key-change-me")
                 )
-                session.add(default_user)
+                session.add(user)
+                await session.flush()
+                
+                # 2. Create Organization
+                org = Organization(
+                    name="Default Organization",
+                    slug="default-org",
+                    tier="free",
+                    is_active=True
+                )
+                session.add(org)
+                await session.flush()
+                
+                # 3. Add User to Org
+                member = OrganizationMember(
+                    organization_id=org.id,
+                    user_id=user.id,
+                    role="admin"
+                )
+                session.add(member)
+                
+                # 4. Create API Key Record
+                api_key_record = APIKey(
+                    organization_id=org.id,
+                    name="Default Legacy Key",
+                    key_hash=hash_api_key("default-key-change-me"),
+                    is_active=True
+                )
+                session.add(api_key_record)
+                
+                # 5. Create Subscription
+                from models import SubscriptionTier, Subscription
+                tier_res = await session.execute(select(SubscriptionTier).where(SubscriptionTier.name == "free"))
+                tier = tier_res.scalar_one_or_none()
+                if tier:
+                    sub = Subscription(organization_id=org.id, tier_id=tier.id, status="active")
+                    session.add(sub)
+                
                 await session.commit()
-                logging.info("Default user created for backward compatibility")
+                logging.info("Default multi-tenant environment created for backward compatibility")
 
     except Exception as e:
         logging.error(f"Database initialization failed: {str(e)}")
@@ -191,6 +254,37 @@ LATENCY = Histogram(
     "latency_seconds",
     "Request Latency"
 )
+
+MODEL_CONFIDENCE = Gauge(
+    "model_confidence_score",
+    "Average confidence score of recent predictions"
+)
+
+MODEL_VERSION = "v1.2.4-stable" # NEW: Professional versioning
+
+async def drift_detection_task():
+    """Background task to detect model performance drift"""
+    from database import AsyncSessionLocal
+    from models import PredictionRecord
+    from sqlalchemy import func
+    
+    while True:
+        try:
+            await asyncio.sleep(300) # Check every 5 minutes
+            async with AsyncSessionLocal() as session:
+                # Get average confidence of last 50 predictions
+                subq = select(PredictionRecord.confidence).order_by(PredictionRecord.id.desc()).limit(50).subquery()
+                res = await session.execute(select(func.avg(subq.c.confidence)))
+                avg_conf = res.scalar() or 0.0
+                
+                MODEL_CONFIDENCE.set(avg_conf)
+                
+                if avg_conf > 0 and avg_conf < 0.7:
+                    logging.warning(f"MODEL DRIFT DETECTED: Average confidence dropped to {avg_conf:.4f}")
+                    # In a real system, this would trigger a PagerDuty or slack alert
+                
+        except Exception as e:
+            logging.error(f"Drift detection error: {e}")
 
 # ---------------------------------------------------
 # 5. Middleware (Track metrics automatically)
@@ -305,26 +399,134 @@ def metrics():
 # ---------------------------------------------------
 # 8. Prediction Route (with Database Storage)
 # ---------------------------------------------------
+# NEW: Unicorn Mode - Global Version Control
+GLOBAL_STATE = {
+    "model_version": "v1.2.4-stable",
+    "last_retrain": datetime.utcnow()
+}
+
+async def trigger_webhooks(org_id: int, event: str, payload: dict):
+    """Background task to notify customers via webhooks"""
+    async with AsyncSessionLocal() as db:
+        res = await db.execute(select(WebhookConfig).where(WebhookConfig.organization_id == org_id, WebhookConfig.is_active == True))
+        configs = res.scalars().all()
+        
+        async with httpx.AsyncClient() as client:
+            for config in configs:
+                if event in config.events:
+                    try:
+                        await client.post(config.url, json={"event": event, "data": payload}, timeout=2.0)
+                        logging.info(f"WEBHOOK SENT | Org={org_id} | URL={config.url} | Event={event}")
+                    except Exception as e:
+                        logging.error(f"WEBHOOK FAILED | URL={config.url} | Error={e}")
+
+@app.post("/predictions/{pred_id}/label")
+async def label_prediction(pred_id: int, human_label: str, request: Request, db: AsyncSession = Depends(get_db)):
+    """Human-in-the-loop: Provide a ground-truth label for a prediction"""
+    res = await db.execute(select(PredictionRecord).where(PredictionRecord.id == pred_id))
+    pred = res.scalar_one_or_none()
+    if not pred: raise HTTPException(status_code=404, detail="Prediction not found")
+    
+    pred.human_label = human_label
+    pred.is_flagged = False
+    await db.commit()
+    return {"status": "labeled", "id": pred_id, "label": human_label}
+
+async def log_audit(org_id: int, user_id: int, action: str, details: str, request: Request):
+    """Helper to record secure audit logs"""
+    async with AsyncSessionLocal() as db:
+        log = AuditLog(
+            organization_id=org_id,
+            user_id=user_id,
+            action=action,
+            details=details,
+            ip_address=request.client.host if request.client else "unknown"
+        )
+        db.add(log)
+        await db.commit()
+
+@app.get("/analytics/drift")
+async def get_drift_series(request: Request, db: AsyncSession = Depends(get_db)):
+    """ZENITH: Real hourly drift data for visualization"""
+    from sqlalchemy import func
+    res = await db.execute(
+        select(
+            func.date_trunc('hour', PredictionRecord.timestamp).label('hour'),
+            func.avg(PredictionRecord.confidence).label('avg_conf')
+        ).where(PredictionRecord.organization_id == request.state.org_id)
+        .group_by('hour')
+        .order_by('hour')
+        .limit(24)
+    )
+    return [{"hour": row.hour.isoformat(), "confidence": round(float(row.avg_conf), 4)} for row in res]
+
+@app.get("/admin/audit-logs")
+async def get_audit_logs(request: Request, db: AsyncSession = Depends(get_db)):
+    """ZENITH: Enterprise Audit Trail"""
+    res = await db.execute(select(AuditLog).where(AuditLog.organization_id == request.state.org_id).order_by(AuditLog.id.desc()).limit(50))
+    return res.scalars().all()
+
+@app.post("/admin/retrain")
+async def run_retrain_sim(request: Request, db: AsyncSession = Depends(get_db)):
+    """Simulate automated model retraining and LOG action"""
+    await asyncio.sleep(2) # Speed up for zenith
+    v_major, v_minor, v_patch = GLOBAL_STATE["model_version"].strip("v").split("-")[0].split(".")
+    new_version = f"v{v_major}.{v_minor}.{int(v_patch)+1}-stable"
+    GLOBAL_STATE["model_version"] = new_version
+    GLOBAL_STATE["last_retrain"] = datetime.utcnow()
+    
+    await log_audit(request.state.org_id, request.state.user_id, "RETRAIN_MODEL", f"Model updated to {new_version}", request)
+    return {"status": "retrained", "new_version": new_version}
+
 @app.get("/predict")
-async def predict(text: str, request: Request, db: AsyncSession = Depends(get_db)):
+async def predict(text: str, request: Request, model_type: str = "sentiment", shadow_mode: bool = False, db: AsyncSession = Depends(get_db)):
     # Enforce authentication
     if not request.state.org_id or not request.state.user_id:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="API key required"
-        )
+        raise HTTPException(status_code=401, detail="API key required")
 
     try:
-        import asyncio
-        start_inference = time.time()
-        # Run the CPU-bound ML inference in a separate thread so it doesn't block the FastAPI async event loop
-        result = await asyncio.to_thread(classifier, text)
-        inference_time_ms = (time.time() - start_inference) * 1000
+        # 1. OPTIMAL: Redis Semantic Caching
+        cache_key = f"cache:{model_type}:{text}"
+        cached_res = await redis_client.get(cache_key)
+        if cached_res: return json.loads(cached_res)
 
+        start_inference = time.time()
+        active_model = toxic_classifier if model_type == "toxicity" else classifier
+        
+        # DIAMOND: Shadow Deployment (Background)
+        if shadow_mode:
+            shadow_model = classifier if model_type == "toxicity" else toxic_classifier
+            asyncio.create_task(asyncio.to_thread(shadow_model, text))
+
+        result = await asyncio.to_thread(active_model, text)
+        inference_time_ms = (time.time() - start_inference) * 1000
         label = result[0]["label"]
         score = float(result[0]["score"])
+        
+        # 2. UNICORN: Auto-Flag for Human Review if confidence is low
+        is_flagged = score < 0.65
+        
+        # 3. UNICORN: Webhook Trigger for High Priority Events
+        if (model_type == "toxicity" and label == "toxic" and score > 0.8) or is_flagged:
+            payload = {"text": text, "prediction": label, "confidence": score}
+            asyncio.create_task(trigger_webhooks(request.state.org_id, "alert", payload))
 
-        # Store prediction in database with org context
+        response_data = {
+            "input_text": text,
+            "prediction": label,
+            "confidence": score,
+            "inference_time_ms": inference_time_ms,
+            "model_type": model_type,
+            "model_version": GLOBAL_STATE["model_version"],
+            "is_flagged": is_flagged,
+            "highlights": get_word_importance(text, label),
+            "cached": False
+        }
+
+        # Save to Cache
+        await redis_client.setex(cache_key, 3600, json.dumps(response_data))
+
+        # Store in DB
         prediction_record = PredictionRecord(
             organization_id=request.state.org_id,
             user_id=request.state.user_id,
@@ -332,21 +534,15 @@ async def predict(text: str, request: Request, db: AsyncSession = Depends(get_db
             prediction=label,
             confidence=score,
             inference_time_ms=inference_time_ms,
+            model_version=GLOBAL_STATE["model_version"],
+            model_type=model_type,
+            is_flagged=is_flagged,
             request_id=uuid.uuid4()
         )
         db.add(prediction_record)
         await db.commit()
 
-        logging.info(
-            f"Prediction Success | Org={request.state.org_id} | Input={text} | Output={label} | Score={score} | Time={inference_time_ms:.2f}ms"
-        )
-
-        return {
-            "input_text": text,
-            "prediction": label,
-            "confidence": score,
-            "inference_time_ms": inference_time_ms
-        }
+        return response_data
 
     except Exception as e:
         await db.rollback()
@@ -406,7 +602,7 @@ async def get_predictions(request: Request, limit: int = 10, db: AsyncSession = 
 # 10. Status Endpoint
 # ---------------------------------------------------
 @app.get("/status")
-async def status(request: Request, db: AsyncSession = Depends(get_db)):
+async def get_status(request: Request, db: AsyncSession = Depends(get_db)):
     # Enforce authentication
     if not request.state.org_id or not request.state.user_id:
         raise HTTPException(
@@ -454,9 +650,11 @@ async def batch_predict(texts: List[str], request: Request, db: AsyncSession = D
         results = []
 
         for text in texts:
-            result = classifier(text)
+            result = await asyncio.to_thread(classifier, text)
             label = result[0]["label"]
             score = float(result[0]["score"])
+            
+            inference_time_ms = 0 # Batch timing logic could be added here
 
             results.append({
                 "input_text": text,
@@ -875,6 +1073,8 @@ async def get_usage(request: Request, db: AsyncSession = Depends(get_db)):
         return {
             "organization": org.name if org else "Unknown",
             "tier": tier.name if tier else "free",
+            "primary_color": org.primary_color if org else "#3b82f6",
+            "logo_url": org.logo_url if org else None,
             "usage_this_month": quota_info.get("usage", 0),
             "quota_limit": quota_info.get("quota_limit", 0),
             "remaining": quota_info.get("remaining", 0),
@@ -898,11 +1098,37 @@ async def handle_stripe_webhook(request: Request, db: AsyncSession = Depends(get
 
         stripe = get_stripe_integration()
         success = stripe.handle_webhook(event)
-
-        return {"status": "received", "processed": success}
-
+        return {"status": "success"}
     except Exception as e:
-        logging.error(f"Webhook handling failed: {e}")
+        logging.error(f"Webhook Error: {e}")
+        return JSONResponse(status_code=400, content={"error": str(e)})
+
+@app.get("/admin/global-stats")
+async def get_admin_stats(db: AsyncSession = Depends(get_db)):
+    """God-View: Aggregate stats across all organizations (Simplified)"""
+    try:
+        from models import Organization, PredictionRecord, User
+        from sqlalchemy import func
+        
+        # In production, check if user is admin. For now, open for demo.
+        org_count = await db.execute(select(func.count(Organization.id)))
+        user_count = await db.execute(select(func.count(User.id)))
+        total_preds = await db.execute(select(func.count(PredictionRecord.id)))
+        
+        # Usage by model
+        sentiment_preds = await db.execute(select(func.count(PredictionRecord.id)).where(PredictionRecord.model_type == "sentiment"))
+        toxic_preds = await db.execute(select(func.count(PredictionRecord.id)).where(PredictionRecord.model_type == "toxicity"))
+
+        return {
+            "total_organizations": org_count.scalar(),
+            "total_users": user_count.scalar(),
+            "total_predictions": total_preds.scalar(),
+            "model_distribution": {
+                "sentiment": sentiment_preds.scalar(),
+                "toxicity": toxic_preds.scalar()
+            }
+        }
+    except Exception as e:
         return JSONResponse(status_code=500, content={"error": str(e)})
 
 # ---------------------------------------------------

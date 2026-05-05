@@ -217,12 +217,17 @@ class RateLimiter:
         return next_month.isoformat()
 
 
+import os
+
 # Singleton instance
 _rate_limiter = None
 
-def get_rate_limiter(redis_url: str = "redis://localhost:6379") -> RateLimiter:
+def get_rate_limiter(redis_url: str = None) -> RateLimiter:
     """Get or create rate limiter instance"""
     global _rate_limiter
+    if redis_url is None:
+        redis_url = os.environ.get("REDIS_URL", "redis://localhost:6379")
+        
     if _rate_limiter is None:
         _rate_limiter = RateLimiter(redis_url)
     return _rate_limiter

@@ -51,7 +51,8 @@ services:
     ports:
       - "8001:8000"
     volumes:
-      - .:/app
+      - ./app.log:/app/app.log
+    
     environment:
       - JAEGER_HOST=jaeger
       - JAEGER_PORT=6831
@@ -70,8 +71,8 @@ services:
     ports:
       - "9091:9090"
     volumes:
-      - ./prometheus.yml:/etc/prometheus/prometheus.yml
-      - ./alert-rules.yml:/etc/prometheus/alert-rules.yml
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./monitoring/alert-rules.yml:/etc/prometheus/alert-rules.yml
       - prometheus_data:/prometheus
     command:
       - "--config.file=/etc/prometheus/prometheus.yml"
@@ -87,7 +88,7 @@ services:
     ports:
       - "9093:9093"
     volumes:
-      - ./alertmanager.yml:/etc/alertmanager/alertmanager.yml
+      - ./monitoring/alertmanager.yml:/etc/alertmanager/alertmanager.yml
       - alertmanager_data:/alertmanager
     command:
       - "--config.file=/etc/alertmanager/alertmanager.yml"
@@ -118,7 +119,7 @@ services:
     ports:
       - "3011:3100"
     volumes:
-      - ./loki-config.yaml:/etc/loki/local-config.yaml
+      - ./monitoring/loki-config.yaml:/etc/loki/local-config.yaml
       - loki_data:/loki
     tmpfs:
       - /wal
@@ -132,7 +133,7 @@ services:
     image: grafana/promtail:latest
     container_name: promtail
     volumes:
-      - ./promtail-config.yaml:/etc/promtail/config.yaml
+      - ./monitoring/promtail-config.yaml:/etc/promtail/config.yaml
       - ./app.log:/app.log
     command: -config.file=/etc/promtail/config.yaml
     networks:
@@ -150,7 +151,9 @@ services:
       - GF_SECURITY_ADMIN_USER=admin
     volumes:
       - grafana_data:/var/lib/grafana
-      - ./grafana-datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml
+      - ./monitoring/grafana-datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml
+      - ./monitoring/grafana-dashboard-provider.yml:/etc/grafana/provisioning/dashboards/provider.yml
+      - ./monitoring/grafana-dashboard.json:/var/lib/grafana/dashboards/finsight-mlops.json
     networks:
       - monitoring
     restart: unless-stopped
